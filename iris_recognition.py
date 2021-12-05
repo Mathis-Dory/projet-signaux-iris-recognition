@@ -44,61 +44,53 @@ class IrisDetection:
         self.img_loaded_2 = cv.imread(self.path_2)
         numpy_horizontal_concat = np.concatenate(
             (self.img_loaded_1, self.img_loaded_2), axis=1)
-        """
         cv.imshow('Images originales', numpy_horizontal_concat)
         cv.waitKey(0)
         cv.destroyAllWindows()
         cv.waitKey(1)
-        """
 
     def img_2_gray(self):
         self.img_gray_1 = cv.cvtColor(self.img_loaded_1, cv.COLOR_BGR2GRAY)
         self.img_gray_2 = cv.cvtColor(self.img_loaded_2, cv.COLOR_BGR2GRAY)
         numpy_horizontal_concat = np.concatenate(
             (self.img_gray_1, self.img_gray_2), axis=1)
-        """
         cv.imshow('Images Gris', numpy_horizontal_concat)
         cv.waitKey(0)
         cv.destroyAllWindows()
         cv.waitKey(1)
-        """
 
     def gaussian_filter(self):
-        self.gaussian_1 = cv.GaussianBlur(self.img_gray_1, (9, 9), 0)
-        self.gaussian_2 = cv.GaussianBlur(self.img_gray_2, (9, 9), 0)
+        self.gaussian_1 = cv.GaussianBlur(self.img_gray_1, (5, 5), 0)
+        self.gaussian_2 = cv.GaussianBlur(self.img_gray_2, (5, 5), 0)
         numpy_horizontal_concat = np.concatenate(
             (self.gaussian_1, self.gaussian_2), axis=1)
-        """
         cv.imshow('Images Gauss', numpy_horizontal_concat)
         cv.waitKey(0)
         cv.destroyAllWindows()
         cv.waitKey(1)
-        """
 
     def canny_img(self):
         self.img_edge_1 = cv.Canny(
-            image=self.gaussian_1, threshold1=50, threshold2=100)
+            image=self.gaussian_1, threshold1=60, threshold2=70)
         self.img_edge_2 = cv.Canny(
-            image=self.gaussian_2, threshold1=50, threshold2=100)
+            image=self.gaussian_2, threshold1=60, threshold2=70)
         numpy_horizontal_concat = np.concatenate(
             (self.img_edge_1, self.img_edge_2), axis=1)
-        """
         cv.imshow('Images Canny', numpy_horizontal_concat)
         cv.waitKey(0)
         cv.destroyAllWindows()
         cv.waitKey(1)
-        """
 
     def hough_transform_pupil(self):
         # Les pixels au dessus de 150 deviennent blancs
         ret, self.binary_1 = cv.threshold(
-            self.img_edge_1, 150, 255, cv.THRESH_BINARY)
+            self.img_edge_1, 100, 255, cv.THRESH_BINARY)
         # On utilise le contour TREE afin de lister tous les contours avec un ordre hierarchique
         # contours, hierarchy = cv.findContours(self.binary_1, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
         # Possible de dessiner les contours avec cv.drawContours(img, contours, -1, (0,255,0), 3)
         # Image en 8 bits, methode, dp, minDist entre les centres
         circles = cv.HoughCircles(self.binary_1, cv.HOUGH_GRADIENT, 1, self.gaussian_1.shape[0],
-                                  param1=100, param2=30,
+                                  param1=200, param2=1,
                                   minRadius=1, maxRadius=65)
 
         if circles is not None:
@@ -110,7 +102,7 @@ class IrisDetection:
                 self.mask_1 = np.zeros_like(self.img_loaded_1)
                 self.mask_1 = cv.circle(
                     self.mask_1, center, radius, (255, 255, 255), -1)
-                #cv.circle(self.img_loaded_1, center, radius, (255, 0, 255), 3)
+                cv.circle(self.img_loaded_1, center, radius, (255, 0, 255), 3)
                 self.pupil_1 = (center[0], center[1], radius)
 
         # Image 2
@@ -119,7 +111,7 @@ class IrisDetection:
             self.img_edge_2, 150, 255, cv.THRESH_BINARY)
 
         circles = cv.HoughCircles(self.binary_2, cv.HOUGH_GRADIENT, 1, self.gaussian_2.shape[0],
-                                  param1=100, param2=30,
+                                  param1=200, param2=1,
                                   minRadius=1, maxRadius=65)
 
         if circles is not None:
@@ -131,22 +123,27 @@ class IrisDetection:
                 self.mask_3 = np.zeros_like(self.img_loaded_1)
                 self.mask_3 = cv.circle(
                     self.mask_3, center, radius, (255, 255, 255), -1)
-                #cv.circle(self.img_loaded_2, center, radius, (255, 0, 255), 3)
+                cv.circle(self.img_loaded_2, center, radius, (255, 0, 255), 3)
                 self.pupil_2 = (center[0], center[1], radius)
 
         numpy_horizontal_concat = np.concatenate(
+            (self.binary_1, self.binary_2), axis=1)
+        cv.imshow('Images Binaires', numpy_horizontal_concat)
+        cv.waitKey(0)
+        cv.destroyAllWindows()
+        cv.waitKey(1)
+        numpy_horizontal_concat = np.concatenate(
             (self.img_loaded_1, self.img_loaded_2), axis=1)
-        """
         cv.imshow('Images Pupille', numpy_horizontal_concat)
         cv.waitKey(0)
         cv.destroyAllWindows()
         cv.waitKey(1)
-        """
 
     def detect_iris(self):
-        # La distance minimum est donnée par le double du rayon de la pupille ( donc son diamètre ) afin d'éviter d'autres cercles
-        circles = cv.HoughCircles(self.binary_1, cv.HOUGH_GRADIENT, 1, self.pupil_1[2] * 2, param1=100, param2=30,
-                                  minRadius=50, maxRadius=120)
+        # La distance minimum est donnée par le double du rayon de la pupille ( donc son diamètre ) afin d'éviter
+        # d'autres cercles
+        circles = cv.HoughCircles(self.binary_1, cv.HOUGH_GRADIENT, 1, self.pupil_1[2] * 8, param1=200, param2=1,
+                                  minRadius=80, maxRadius=110)
         if circles is not None:
             circles = np.uint16(np.around(circles))
             for i in circles[0, :]:
@@ -157,13 +154,13 @@ class IrisDetection:
                 self.mask_2 = np.zeros_like(self.img_loaded_1)
                 self.mask_2 = cv.circle(
                     self.mask_2, center, radius, (255, 255, 255), -1)
-                #cv.circle(self.img_loaded_1, center, radius, (255, 0, 255), 3)
+                cv.circle(self.img_loaded_1, center, radius, (255, 0, 255), 3)
                 self.iris_1 = (center[0], center[1], radius)
 
         # Image 2
 
-        circles = cv.HoughCircles(self.binary_2, cv.HOUGH_GRADIENT, 1, self.pupil_2[2] * 2, param1=100, param2=30,
-                                  minRadius=50, maxRadius=120)
+        circles = cv.HoughCircles(self.binary_2, cv.HOUGH_GRADIENT, 1, self.pupil_2[2] * 8, param1=200, param2=1,
+                                  minRadius=80, maxRadius=110)
         if circles is not None:
             circles = np.uint16(np.around(circles))
             for i in circles[0, :]:
@@ -174,17 +171,15 @@ class IrisDetection:
                 self.mask_4 = np.zeros_like(self.img_loaded_2)
                 self.mask_4 = cv.circle(
                     self.mask_4, center, radius, (255, 255, 255), -1)
-                #cv.circle(self.img_loaded_2, center, radius, (255, 0, 255), 3)
+                cv.circle(self.img_loaded_2, center, radius, (255, 0, 255), 3)
                 self.iris_2 = (center[0], center[1], radius)
 
         numpy_horizontal_concat = np.concatenate(
             (self.img_loaded_1, self.img_loaded_2), axis=1)
-        """
         cv.imshow('Images Iris', numpy_horizontal_concat)
         cv.waitKey(0)
         cv.destroyAllWindows()
         cv.waitKey(1)
-        """
 
     def sub_mask(self):
         mask_final_1 = cv.subtract(self.mask_2, self.mask_1)
@@ -215,11 +210,15 @@ class IrisRecognition():
         self.mask_2 = cv.imread(mask2, cv.IMREAD_UNCHANGED)
         self.iris_1 = iris_1
         self.iris_2 = iris_2
+        self.dHash_value_decimal_1 = None
+        self.dHash_value_decimal_2 = None
 
     def start(self):
         self.transparency()
         self.crop()
         self.normalisation()
+        self.get_dHash()
+        self.hamming(self.dHash_value_decimal_1, self.dHash_value_decimal_2)
 
     def crop(self):
         # (1) Convert to gray, and threshold
@@ -237,7 +236,7 @@ class IrisRecognition():
 
         # (4) Crop and save it
         x, y, w, h = cv.boundingRect(cnt)
-        dst = self.mask_1[y:y+h, x:x+w]
+        dst = self.mask_1[y:y + h, x:x + w]
         cv.imwrite("crop_1.png", dst)
 
         # (1) Convert to gray, and threshold
@@ -255,17 +254,17 @@ class IrisRecognition():
 
         # (4) Crop and save it
         x, y, w, h = cv.boundingRect(cnt)
-        dst = self.mask_2[y:y+h, x:x+w]
+        dst = self.mask_2[y:y + h, x:x + w]
         cv.imwrite("crop_2.png", dst)
 
     def transparency(self):
         trans_mask = self.mask_1[:, :, 3] == 0
         self.mask_1[trans_mask] = [255, 255, 255, 0]
-        #cv.imwrite("test alpha.png", self.mask_1)
+        # cv.imwrite("test alpha.png", self.mask_1)
 
         trans_mask = self.mask_2[:, :, 3] == 0
         self.mask_2[trans_mask] = [255, 255, 255, 0]
-        #cv.imwrite("test alpha2.png", self.mask_2)
+        # cv.imwrite("test alpha2.png", self.mask_2)
 
     def normalisation(self):
         # Do the polar rotation along 1024 angular steps with a radius of 256 pixels.
@@ -277,7 +276,7 @@ class IrisRecognition():
 
         # crop image
         polar_img = polar_img[int(polar_img.shape[0] / 2)
-                                  : polar_img.shape[0], 0: polar_img.shape[1]]
+                              : polar_img.shape[0], 0: polar_img.shape[1]]
         polar_img = cv.cvtColor(polar_img, cv.COLOR_BGR2GRAY)
 
         _, threshold = cv.threshold(polar_img, 100, 255, cv.THRESH_BINARY)
@@ -306,14 +305,33 @@ class IrisRecognition():
         cv.destroyAllWindows()
         cv.waitKey(1)
 
-        """
-        bbox = cv.boundingRect(threshold)
-        x, y, w, h = bbox
-        foreground = polar_img
-        cv.imwrite("foreground.png", foreground)
-        """
+    def get_dHash(self):
+        image_1 = cv.imread("foreground.png", cv.IMREAD_GRAYSCALE)
+        image_1 = cv.resize(image_1, (9, 8), interpolation=cv.INTER_AREA)
+        image_list_1 = sum(image_1.tolist(), [])
+        hashString_1 = ''
+        for i in range(1, len(image_list_1)):
+            if i % (image_1.shape[1]) != 0:
+                if image_list_1[i - 1] > image_list_1[i]:
+                    hashString_1 += '1'
+                else:
+                    hashString_1 += '0'
+        self.dHash_value_decimal_1 = int(hashString_1, 2)
+
+        image_2 = cv.imread("foreground2.png", cv.IMREAD_GRAYSCALE)
+        image_2 = cv.resize(image_2, (9, 8), interpolation=cv.INTER_AREA)
+        image_list_2 = sum(image_2.tolist(), [])
+        hashString_2 = ''
+        for i in range(1, len(image_list_2)):
+            if i % (image_2.shape[1]) != 0:
+                if image_list_2[i - 1] > image_list_2[i]:
+                    hashString_2 += '1'
+                else:
+                    hashString_2 += '0'
+        self.dHash_value_decimal_2 = int(hashString_2, 2)
+
 
 
 if __name__ == "__main__":
-    test = IrisDetection('database/002/01.bmp', 'database/001/01.bmp').start()
+    test = IrisDetection('database/002/01.bmp', 'database/003/02.bmp').start()
     IrisRecognition('mask_1.png', 'mask_2.png', test[0], test[1]).start()
