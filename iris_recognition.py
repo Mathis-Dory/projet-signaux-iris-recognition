@@ -1,6 +1,9 @@
 import numpy as np
 import cv2 as cv
-from scipy.spatial import distance
+from tkinter import Tk
+import tkinter as tk
+from tkinter.filedialog import askopenfilename
+from tkinter import messagebox
 
 
 class IrisDetection:
@@ -72,6 +75,7 @@ class IrisDetection:
         # On utilise le contour TREE afin de lister tous les contours avec un ordre hierarchique
         # contours, hierarchy = cv.findContours(self.binary_1, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
         # Possible de dessiner les contours avec cv.drawContours(img, contours, -1, (0,255,0), 3)
+
         # Image en 8 bits, methode, dp, minDist entre les centres
         circles = cv.HoughCircles(self.binary_1, cv.HOUGH_GRADIENT, 1, self.gaussian_1.shape[0],
                                   param1=200, param2=1,
@@ -87,6 +91,7 @@ class IrisDetection:
                 self.mask_1 = cv.circle(
                     self.mask_1, center, radius, (255, 255, 255), -1)
                 self.pupil_1 = (center[0], center[1], radius)
+                cv.circle(self.img_loaded_1, center, radius, (255, 0, 255), 3)
 
         # Image 2
 
@@ -107,9 +112,10 @@ class IrisDetection:
                 self.mask_3 = cv.circle(
                     self.mask_3, center, radius, (255, 255, 255), -1)
                 self.pupil_2 = (center[0], center[1], radius)
+                cv.circle(self.img_loaded_2, center, radius, (255, 0, 255), 3)
 
     def detect_iris(self):
-        # La distance minimum est donnée par le double du rayon de la pupille ( donc son diamètre ) afin d'éviter
+        # La distance minimum entre deux cercles est donnée par le rayon de la pupille * 8 afin d'éviter
         # d'autres cercles
         circles = cv.HoughCircles(self.binary_1, cv.HOUGH_GRADIENT, 1, self.pupil_1[2] * 8, param1=200, param2=1,
                                   minRadius=80, maxRadius=110)
@@ -170,21 +176,19 @@ class IrisDetection:
             (self.img_edge_1, self.img_edge_2), axis=1)
         numpy_concat_binary = np.concatenate(
             (self.binary_1, self.binary_2), axis=1)
-        numpy_concat_pupils = np.concatenate(
-            (self.img_loaded_1, self.img_loaded_2), axis=1)
         numpy_concat_iris = np.concatenate(
             (self.img_loaded_1, self.img_loaded_2), axis=1)
 
         ver1 = np.concatenate(
             (numpy_concat_grey, numpy_concat_gauss, numpy_concat_canny, numpy_concat_binary), axis=0)
-        ver2 = np.concatenate(
-            (numpy_concat_pupils, numpy_concat_iris), axis=0)
-        #vertical = np.column_stack((ver1, ver2))
+        ver2 = numpy_concat_iris
+        # vertical = np.column_stack((ver1, ver2))
         cv.imshow("Images grises -> Gauss -> Canny -> binaires", ver1)
-        cv.imshow("Images pupilles -> Images iris", ver2)
+        cv.imshow("Images iris", ver2)
         cv.waitKey(0)
         cv.destroyAllWindows()
         cv.waitKey(1)
+
 
 # Pour la création d'un masque des paupières voir https://books.google.be/books?id=SI29AgAAQBAJ&pg=PA149&lpg=PA149&dq=iris+recon+matlab&source=bl&ots=Ae633czDjg&sig=ACfU3U3wu6AIhpf8zz56CKe0WL6yP-YAug&hl=fr&sa=X&ved=2ahUKEwjQucmpyrT0AhXP3KQKHS_OBOEQ6AF6BAgUEAM#v=onepage&q=iris%20recon%20matlab&f=false
 
@@ -204,8 +208,8 @@ class IrisRecognition():
         self.transparency()
         self.crop()
         self.normalisation()
-        self.get_keypoints()
         self.display()
+        self.get_keypoints()
 
     def crop(self):
         # Méthode pour détourer le vide inutile à l'extérieur de l'iris,
@@ -262,7 +266,6 @@ class IrisRecognition():
             cv.WARP_POLAR_LINEAR)
         polar_img = cv.rotate(polar_img, cv.ROTATE_90_COUNTERCLOCKWISE)
 
-        # crop image
         polar_img = polar_img[int(polar_img.shape[0] / 2): polar_img.shape[0], 0: polar_img.shape[1]]
         polar_img = cv.cvtColor(polar_img, cv.COLOR_BGR2GRAY)
         self.polar_1 = polar_img
@@ -302,11 +305,10 @@ class IrisRecognition():
             if m.distance < 0.75 * n.distance:
                 good.append([m])
 
-        print(len(good))
         if len(good) >= 40:
-            print("Match")
+            print("Les iris sont pareilles, avec un score de " + str(len(good)))
         else:
-            print("not match")
+            print("Les iris sont différentes, avec un score de " + str(len(good)))
 
     def display(self):
         numpy_concat_vertical = np.concatenate(
@@ -319,6 +321,12 @@ class IrisRecognition():
 
 
 if __name__ == "__main__":
-    data = IrisDetection('database/004/03.bmp', 'database/004/04.bmp').start()
+    Tk().withdraw()
+    tk.messagebox.showinfo(title="Iris Recognition", message="Choisissez un premier iris")
+    filename_1 = askopenfilename(title="Choisir un iris 1")
+
+    tk.messagebox.showinfo(title="Iris Recognition", message="Choisissez un second iris")
+    filename_2 = askopenfilename(title="Choisir un iris 2")
+    data = IrisDetection(filename_1, filename_2).start()
     IrisRecognition('mask_1.png', 'mask_2.png',
                     data[0], data[1], data[2], data[3]).start()
