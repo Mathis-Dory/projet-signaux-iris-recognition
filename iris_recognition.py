@@ -1,5 +1,6 @@
 import numpy as np
 import cv2 as cv
+from scipy.spatial import distance
 
 global pupil_1
 global pupil_2
@@ -37,7 +38,7 @@ class IrisDetection:
         self.detect_iris()
         self.sub_mask()
         # self.write_txt()
-        return self.iris_1, self.iris_2
+        return self.iris_1, self.iris_2, self.pupil_1, self.pupil_2
 
     def read_img(self):
         self.img_loaded_1 = cv.imread(self.path_1)
@@ -102,7 +103,7 @@ class IrisDetection:
                 self.mask_1 = np.zeros_like(self.img_loaded_1)
                 self.mask_1 = cv.circle(
                     self.mask_1, center, radius, (255, 255, 255), -1)
-                cv.circle(self.img_loaded_1, center, radius, (255, 0, 255), 3)
+                # cv.circle(self.img_loaded_1, center, radius, (255, 0, 255), 3)
                 self.pupil_1 = (center[0], center[1], radius)
 
         # Image 2
@@ -123,7 +124,7 @@ class IrisDetection:
                 self.mask_3 = np.zeros_like(self.img_loaded_1)
                 self.mask_3 = cv.circle(
                     self.mask_3, center, radius, (255, 255, 255), -1)
-                cv.circle(self.img_loaded_2, center, radius, (255, 0, 255), 3)
+                # cv.circle(self.img_loaded_2, center, radius, (255, 0, 255), 3)
                 self.pupil_2 = (center[0], center[1], radius)
 
         numpy_horizontal_concat = np.concatenate(
@@ -201,24 +202,29 @@ class IrisDetection:
         f = open("iris.txt", "a")
         f.write(str(self.iris_2))
         f.close()
+        f = open("iris.txt", "a")
+        f.write(str(self.pupil_1))
+        f.close()
+        f = open("iris.txt", "a")
+        f.write(str(self.pupil_2))
+        f.close()
 
 
 # Pour la création d'un masque des paupières voir https://books.google.be/books?id=SI29AgAAQBAJ&pg=PA149&lpg=PA149&dq=iris+recon+matlab&source=bl&ots=Ae633czDjg&sig=ACfU3U3wu6AIhpf8zz56CKe0WL6yP-YAug&hl=fr&sa=X&ved=2ahUKEwjQucmpyrT0AhXP3KQKHS_OBOEQ6AF6BAgUEAM#v=onepage&q=iris%20recon%20matlab&f=false
 class IrisRecognition():
-    def __init__(self, mask1, mask2, iris_1, iris_2):
+    def __init__(self, mask1, mask2, iris_1, iris_2, pupil_1, pupil_2):
         self.mask_1 = cv.imread(mask1, cv.IMREAD_UNCHANGED)
         self.mask_2 = cv.imread(mask2, cv.IMREAD_UNCHANGED)
         self.iris_1 = iris_1
         self.iris_2 = iris_2
-        self.dHash_value_decimal_1 = None
-        self.dHash_value_decimal_2 = None
+        self.pupil_1 = pupil_1
+        self.pupil_2 = pupil_2
 
     def start(self):
         self.transparency()
         self.crop()
         self.normalisation()
-        self.get_dHash()
-        self.hamming(self.dHash_value_decimal_1, self.dHash_value_decimal_2)
+        self.get_keypoints()
 
     def crop(self):
         # (1) Convert to gray, and threshold
@@ -267,11 +273,11 @@ class IrisRecognition():
         # cv.imwrite("test alpha2.png", self.mask_2)
 
     def normalisation(self):
-        # Do the polar rotation along 1024 angular steps with a radius of 256 pixels.
         img_crop1 = cv.imread('crop_1.png')
+
         polar_img = cv.warpPolar(
-            img_crop1, (256, 1024), (self.iris_1[0], self.iris_1[1]), self.iris_1[2] * 2, cv.WARP_POLAR_LINEAR)
-        # Rotate it sideways to be more visually pleasing
+            img_crop1, (256, 1024), (img_crop1.shape[0] / 2, img_crop1.shape[1] / 2), self.iris_1[2] * 2,
+            cv.WARP_POLAR_LINEAR)
         polar_img = cv.rotate(polar_img, cv.ROTATE_90_COUNTERCLOCKWISE)
 
         # crop image
@@ -279,59 +285,54 @@ class IrisRecognition():
                               : polar_img.shape[0], 0: polar_img.shape[1]]
         polar_img = cv.cvtColor(polar_img, cv.COLOR_BGR2GRAY)
 
-        _, threshold = cv.threshold(polar_img, 100, 255, cv.THRESH_BINARY)
-        cv.imwrite("foreground.png", threshold)
-        cv.imshow('threshold', threshold)
-        cv.waitKey(0)
-        cv.destroyAllWindows()
-        cv.waitKey(1)
+        cv.imwrite("foreground.png", polar_img)
 
-        # Do the polar rotation along 1024 angular steps with a radius of 256 pixels.
         img_crop2 = cv.imread('crop_2.png')
+
         polar_img2 = cv.warpPolar(
-            img_crop2, (256, 1024), (self.iris_2[0], self.iris_2[1]), self.iris_2[2] * 2, cv.WARP_POLAR_LINEAR)
-        # Rotate it sideways to be more visually pleasing
+            img_crop2, (256, 1024), (img_crop2.shape[0] / 2, img_crop2.shape[1] / 2), self.iris_2[2] * 2,
+            cv.WARP_POLAR_LINEAR)
         polar_img2 = cv.rotate(polar_img2, cv.ROTATE_90_COUNTERCLOCKWISE)
 
         # crop image
-        polar_img2 = polar_img2[int(
-            polar_img2.shape[0] / 2): polar_img2.shape[0], 0: polar_img2.shape[1]]
+        polar_img2 = polar_img2[int(polar_img2.shape[0] / 2)
+                                : polar_img2.shape[0], 0: polar_img2.shape[1]]
         polar_img2 = cv.cvtColor(polar_img2, cv.COLOR_BGR2GRAY)
 
-        _, threshold2 = cv.threshold(polar_img2, 100, 255, cv.THRESH_BINARY)
-        cv.imwrite("foreground2.png", threshold2)
-        cv.imshow('threshold 2', threshold2)
+        cv.imwrite("foreground2.png", polar_img2)
+        cv.imshow('Image polaire 1', polar_img)
+        cv.waitKey(0)
+        cv.destroyAllWindows()
+        cv.waitKey(1)
+        cv.imshow('Image polaire 2', polar_img2)
         cv.waitKey(0)
         cv.destroyAllWindows()
         cv.waitKey(1)
 
-    def get_dHash(self):
-        image_1 = cv.imread("foreground.png", cv.IMREAD_GRAYSCALE)
-        image_1 = cv.resize(image_1, (9, 8), interpolation=cv.INTER_AREA)
-        image_list_1 = sum(image_1.tolist(), [])
-        hashString_1 = ''
-        for i in range(1, len(image_list_1)):
-            if i % (image_1.shape[1]) != 0:
-                if image_list_1[i - 1] > image_list_1[i]:
-                    hashString_1 += '1'
-                else:
-                    hashString_1 += '0'
-        self.dHash_value_decimal_1 = int(hashString_1, 2)
+    def get_keypoints(self):
+        img = cv.imread('foreground.png')
+        gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
+        alg = cv.AKAZE_create()
+        (kp, desc) = alg.detectAndCompute(gray, None)
 
-        image_2 = cv.imread("foreground2.png", cv.IMREAD_GRAYSCALE)
-        image_2 = cv.resize(image_2, (9, 8), interpolation=cv.INTER_AREA)
-        image_list_2 = sum(image_2.tolist(), [])
-        hashString_2 = ''
-        for i in range(1, len(image_list_2)):
-            if i % (image_2.shape[1]) != 0:
-                if image_list_2[i - 1] > image_list_2[i]:
-                    hashString_2 += '1'
-                else:
-                    hashString_2 += '0'
-        self.dHash_value_decimal_2 = int(hashString_2, 2)
+        img2 = cv.imread('foreground2.png')
+        gray2 = cv.cvtColor(img2, cv.COLOR_BGR2GRAY)
+        (kp2, desc2) = alg.detectAndCompute(gray2, None)
 
+        bf = cv.BFMatcher(cv.NORM_HAMMING)
+        matches = bf.knnMatch(desc, desc2, k=2)
+        good = []
+        for m, n in matches:
+            if m.distance < 0.75 * n.distance:
+                good.append([m])
+
+        print(len(good))
+        if len(good) >= 40:
+            print("Match")
+        else:
+            print("not match")
 
 
 if __name__ == "__main__":
-    test = IrisDetection('database/002/01.bmp', 'database/003/02.bmp').start()
-    IrisRecognition('mask_1.png', 'mask_2.png', test[0], test[1]).start()
+    test = IrisDetection('database/004/03.bmp', 'database/004/04.bmp').start()
+    IrisRecognition('mask_1.png', 'mask_2.png', test[0], test[1], test[2], test[3]).start()
