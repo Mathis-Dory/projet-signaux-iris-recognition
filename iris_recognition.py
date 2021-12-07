@@ -2,19 +2,18 @@ import numpy as np
 import cv2 as cv
 from scipy.spatial import distance
 
-global pupil_1
-global pupil_2
-
 
 class IrisDetection:
     def __init__(self, img_path1, img_path2):
         self.path_1 = img_path1
+        self.original_1 = None
         self.img_loaded_1 = None
         self.img_gray_1 = None
         self.gaussian_1 = None
         self.img_edge_1 = None
         self.binary_1 = None
         self.path_2 = img_path2
+        self.original_1 = None
         self.img_loaded_2 = None
         self.img_gray_2 = None
         self.gaussian_2 = None
@@ -30,6 +29,8 @@ class IrisDetection:
         self.iris_2 = None
 
     def start(self):
+        # Méthode appelée lors de la création d'un objet, renvoyant le tuple des valeurs
+        # pour les iris et pupilles de chaque oeil
         self.read_img()
         self.img_2_gray()
         self.gaussian_filter()
@@ -37,50 +38,32 @@ class IrisDetection:
         self.hough_transform_pupil()
         self.detect_iris()
         self.sub_mask()
-        # self.write_txt()
+        self.display()
         return self.iris_1, self.iris_2, self.pupil_1, self.pupil_2
 
     def read_img(self):
+        # Méthode pour lire une image et utiliser ses données par la suite
         self.img_loaded_1 = cv.imread(self.path_1)
         self.img_loaded_2 = cv.imread(self.path_2)
-        numpy_horizontal_concat = np.concatenate(
-            (self.img_loaded_1, self.img_loaded_2), axis=1)
-        cv.imshow('Images originales', numpy_horizontal_concat)
-        cv.waitKey(0)
-        cv.destroyAllWindows()
-        cv.waitKey(1)
+        self.original_1 = cv.imread(self.path_1)
+        self.original_2 = cv.imread(self.path_2)
 
     def img_2_gray(self):
+        # On convertit les images lues en gris
         self.img_gray_1 = cv.cvtColor(self.img_loaded_1, cv.COLOR_BGR2GRAY)
         self.img_gray_2 = cv.cvtColor(self.img_loaded_2, cv.COLOR_BGR2GRAY)
-        numpy_horizontal_concat = np.concatenate(
-            (self.img_gray_1, self.img_gray_2), axis=1)
-        cv.imshow('Images Gris', numpy_horizontal_concat)
-        cv.waitKey(0)
-        cv.destroyAllWindows()
-        cv.waitKey(1)
 
     def gaussian_filter(self):
+        # On applique un filtre de Gauss
         self.gaussian_1 = cv.GaussianBlur(self.img_gray_1, (5, 5), 0)
         self.gaussian_2 = cv.GaussianBlur(self.img_gray_2, (5, 5), 0)
-        numpy_horizontal_concat = np.concatenate(
-            (self.gaussian_1, self.gaussian_2), axis=1)
-        cv.imshow('Images Gauss', numpy_horizontal_concat)
-        cv.waitKey(0)
-        cv.destroyAllWindows()
-        cv.waitKey(1)
 
     def canny_img(self):
+        # Filtre de Canny pour détecter les contours
         self.img_edge_1 = cv.Canny(
             image=self.gaussian_1, threshold1=60, threshold2=70)
         self.img_edge_2 = cv.Canny(
             image=self.gaussian_2, threshold1=60, threshold2=70)
-        numpy_horizontal_concat = np.concatenate(
-            (self.img_edge_1, self.img_edge_2), axis=1)
-        cv.imshow('Images Canny', numpy_horizontal_concat)
-        cv.waitKey(0)
-        cv.destroyAllWindows()
-        cv.waitKey(1)
 
     def hough_transform_pupil(self):
         # Les pixels au dessus de 150 deviennent blancs
@@ -103,7 +86,6 @@ class IrisDetection:
                 self.mask_1 = np.zeros_like(self.img_loaded_1)
                 self.mask_1 = cv.circle(
                     self.mask_1, center, radius, (255, 255, 255), -1)
-                # cv.circle(self.img_loaded_1, center, radius, (255, 0, 255), 3)
                 self.pupil_1 = (center[0], center[1], radius)
 
         # Image 2
@@ -124,21 +106,7 @@ class IrisDetection:
                 self.mask_3 = np.zeros_like(self.img_loaded_1)
                 self.mask_3 = cv.circle(
                     self.mask_3, center, radius, (255, 255, 255), -1)
-                # cv.circle(self.img_loaded_2, center, radius, (255, 0, 255), 3)
                 self.pupil_2 = (center[0], center[1], radius)
-
-        numpy_horizontal_concat = np.concatenate(
-            (self.binary_1, self.binary_2), axis=1)
-        cv.imshow('Images Binaires', numpy_horizontal_concat)
-        cv.waitKey(0)
-        cv.destroyAllWindows()
-        cv.waitKey(1)
-        numpy_horizontal_concat = np.concatenate(
-            (self.img_loaded_1, self.img_loaded_2), axis=1)
-        cv.imshow('Images Pupille', numpy_horizontal_concat)
-        cv.waitKey(0)
-        cv.destroyAllWindows()
-        cv.waitKey(1)
 
     def detect_iris(self):
         # La distance minimum est donnée par le double du rayon de la pupille ( donc son diamètre ) afin d'éviter
@@ -175,14 +143,11 @@ class IrisDetection:
                 cv.circle(self.img_loaded_2, center, radius, (255, 0, 255), 3)
                 self.iris_2 = (center[0], center[1], radius)
 
-        numpy_horizontal_concat = np.concatenate(
-            (self.img_loaded_1, self.img_loaded_2), axis=1)
-        cv.imshow('Images Iris', numpy_horizontal_concat)
-        cv.waitKey(0)
-        cv.destroyAllWindows()
-        cv.waitKey(1)
-
     def sub_mask(self):
+        # On va supprimer la pupille et l'extérieur de l'iris,
+        # on créé un fichier contenant le résultat du détourage pour chaque image
+
+        # Image 1
         mask_final_1 = cv.subtract(self.mask_2, self.mask_1)
         result1 = cv.cvtColor(self.img_loaded_1, cv.COLOR_BGR2BGRA)
         result1[:, :, 3] = mask_final_1[:, :, 0]
@@ -194,23 +159,36 @@ class IrisDetection:
         result2[:, :, 3] = mask_final_2[:, :, 0]
         cv.imwrite("mask_2.png", result2)
 
-    def write_txt(self):
-        print(self.iris_1, self.iris_2)
-        f = open("iris.txt", "w")
-        f.write(str(self.iris_1))
-        f.close()
-        f = open("iris.txt", "a")
-        f.write(str(self.iris_2))
-        f.close()
-        f = open("iris.txt", "a")
-        f.write(str(self.pupil_1))
-        f.close()
-        f = open("iris.txt", "a")
-        f.write(str(self.pupil_2))
-        f.close()
+    def display(self):
+        numpy_concat_originals = np.concatenate(
+            (self.original_1, self.original_2), axis=1)
+        numpy_concat_grey = np.concatenate(
+            (self.img_gray_1, self.img_gray_2), axis=1)
+        numpy_concat_gauss = np.concatenate(
+            (self.gaussian_1, self.gaussian_2), axis=1)
+        numpy_concat_canny = np.concatenate(
+            (self.img_edge_1, self.img_edge_2), axis=1)
+        numpy_concat_binary = np.concatenate(
+            (self.binary_1, self.binary_2), axis=1)
+        numpy_concat_pupils = np.concatenate(
+            (self.img_loaded_1, self.img_loaded_2), axis=1)
+        numpy_concat_iris = np.concatenate(
+            (self.img_loaded_1, self.img_loaded_2), axis=1)
 
+        ver1 = np.concatenate(
+            (numpy_concat_grey, numpy_concat_gauss, numpy_concat_canny, numpy_concat_binary), axis=0)
+        ver2 = np.concatenate(
+            (numpy_concat_pupils, numpy_concat_iris), axis=0)
+        #vertical = np.column_stack((ver1, ver2))
+        cv.imshow("Images grises -> Gauss -> Canny -> binaires", ver1)
+        cv.imshow("Images pupilles -> Images iris", ver2)
+        cv.waitKey(0)
+        cv.destroyAllWindows()
+        cv.waitKey(1)
 
 # Pour la création d'un masque des paupières voir https://books.google.be/books?id=SI29AgAAQBAJ&pg=PA149&lpg=PA149&dq=iris+recon+matlab&source=bl&ots=Ae633czDjg&sig=ACfU3U3wu6AIhpf8zz56CKe0WL6yP-YAug&hl=fr&sa=X&ved=2ahUKEwjQucmpyrT0AhXP3KQKHS_OBOEQ6AF6BAgUEAM#v=onepage&q=iris%20recon%20matlab&f=false
+
+
 class IrisRecognition():
     def __init__(self, mask1, mask2, iris_1, iris_2, pupil_1, pupil_2):
         self.mask_1 = cv.imread(mask1, cv.IMREAD_UNCHANGED)
@@ -219,46 +197,51 @@ class IrisRecognition():
         self.iris_2 = iris_2
         self.pupil_1 = pupil_1
         self.pupil_2 = pupil_2
+        self.polar_1 = None
+        self.polar_2 = None
 
     def start(self):
         self.transparency()
         self.crop()
         self.normalisation()
         self.get_keypoints()
+        self.display()
 
     def crop(self):
-        # (1) Convert to gray, and threshold
+        # Méthode pour détourer le vide inutile à l'extérieur de l'iris,
+        # il enregistre une image détourée pour chaque oeil
+        # (1) Convertit en gris et création d'une limite
         gray = cv.cvtColor(self.mask_1, cv.COLOR_BGR2GRAY)
         th, threshed = cv.threshold(gray, 240, 255, cv.THRESH_BINARY_INV)
 
-        # (2) Morph-op to remove noise
+        # (2) Morph-op pour supprimer le bruit
         kernel = cv.getStructuringElement(cv.MORPH_ELLIPSE, (11, 11))
         morphed = cv.morphologyEx(threshed, cv.MORPH_CLOSE, kernel)
 
-        # (3) Find the max-area contour
+        # (3) Cherche la zone du contour MAX
         cnts = cv.findContours(morphed, cv.RETR_EXTERNAL,
                                cv.CHAIN_APPROX_SIMPLE)[-2]
         cnt = sorted(cnts, key=cv.contourArea)[-1]
 
-        # (4) Crop and save it
+        # (4) Détoure et enregistre
         x, y, w, h = cv.boundingRect(cnt)
         dst = self.mask_1[y:y + h, x:x + w]
         cv.imwrite("crop_1.png", dst)
 
-        # (1) Convert to gray, and threshold
+        # (1) Convertit en gris et création d'une limite
         gray = cv.cvtColor(self.mask_2, cv.COLOR_BGR2GRAY)
         th, threshed = cv.threshold(gray, 240, 255, cv.THRESH_BINARY_INV)
 
-        # (2) Morph-op to remove noise
+        # (2) Morph-op pour supprimer le bruit
         kernel = cv.getStructuringElement(cv.MORPH_ELLIPSE, (11, 11))
         morphed = cv.morphologyEx(threshed, cv.MORPH_CLOSE, kernel)
 
-        # (3) Find the max-area contour
+        # (3) Cherche la zone du contour MAX
         cnts = cv.findContours(morphed, cv.RETR_EXTERNAL,
                                cv.CHAIN_APPROX_SIMPLE)[-2]
         cnt = sorted(cnts, key=cv.contourArea)[-1]
 
-        # (4) Crop and save it
+        # (4) Détoure et enregistre
         x, y, w, h = cv.boundingRect(cnt)
         dst = self.mask_2[y:y + h, x:x + w]
         cv.imwrite("crop_2.png", dst)
@@ -266,48 +249,41 @@ class IrisRecognition():
     def transparency(self):
         trans_mask = self.mask_1[:, :, 3] == 0
         self.mask_1[trans_mask] = [255, 255, 255, 0]
-        # cv.imwrite("test alpha.png", self.mask_1)
 
         trans_mask = self.mask_2[:, :, 3] == 0
         self.mask_2[trans_mask] = [255, 255, 255, 0]
-        # cv.imwrite("test alpha2.png", self.mask_2)
 
     def normalisation(self):
         img_crop1 = cv.imread('crop_1.png')
 
         polar_img = cv.warpPolar(
-            img_crop1, (256, 1024), (img_crop1.shape[0] / 2, img_crop1.shape[1] / 2), self.iris_1[2] * 2,
+            img_crop1, (256, 1024), (img_crop1.shape[0] / 2,
+                                     img_crop1.shape[1] / 2), self.iris_1[2] * 2,
             cv.WARP_POLAR_LINEAR)
         polar_img = cv.rotate(polar_img, cv.ROTATE_90_COUNTERCLOCKWISE)
 
         # crop image
-        polar_img = polar_img[int(polar_img.shape[0] / 2)
-                              : polar_img.shape[0], 0: polar_img.shape[1]]
+        polar_img = polar_img[int(polar_img.shape[0] / 2): polar_img.shape[0], 0: polar_img.shape[1]]
         polar_img = cv.cvtColor(polar_img, cv.COLOR_BGR2GRAY)
+        self.polar_1 = polar_img
 
         cv.imwrite("foreground.png", polar_img)
 
         img_crop2 = cv.imread('crop_2.png')
 
         polar_img2 = cv.warpPolar(
-            img_crop2, (256, 1024), (img_crop2.shape[0] / 2, img_crop2.shape[1] / 2), self.iris_2[2] * 2,
+            img_crop2, (256, 1024), (img_crop2.shape[0] / 2,
+                                     img_crop2.shape[1] / 2), self.iris_2[2] * 2,
             cv.WARP_POLAR_LINEAR)
         polar_img2 = cv.rotate(polar_img2, cv.ROTATE_90_COUNTERCLOCKWISE)
 
         # crop image
-        polar_img2 = polar_img2[int(polar_img2.shape[0] / 2)
-                                : polar_img2.shape[0], 0: polar_img2.shape[1]]
+        polar_img2 = polar_img2[int(
+            polar_img2.shape[0] / 2): polar_img2.shape[0], 0: polar_img2.shape[1]]
         polar_img2 = cv.cvtColor(polar_img2, cv.COLOR_BGR2GRAY)
+        self.polar_2 = polar_img2
 
         cv.imwrite("foreground2.png", polar_img2)
-        cv.imshow('Image polaire 1', polar_img)
-        cv.waitKey(0)
-        cv.destroyAllWindows()
-        cv.waitKey(1)
-        cv.imshow('Image polaire 2', polar_img2)
-        cv.waitKey(0)
-        cv.destroyAllWindows()
-        cv.waitKey(1)
 
     def get_keypoints(self):
         img = cv.imread('foreground.png')
@@ -332,7 +308,17 @@ class IrisRecognition():
         else:
             print("not match")
 
+    def display(self):
+        numpy_concat_vertical = np.concatenate(
+            (self.polar_1, self.polar_2), axis=0)
+
+        cv.imshow("Images polarisees", numpy_concat_vertical)
+        cv.waitKey(0)
+        cv.destroyAllWindows()
+        cv.waitKey(1)
+
 
 if __name__ == "__main__":
-    test = IrisDetection('database/004/03.bmp', 'database/004/04.bmp').start()
-    IrisRecognition('mask_1.png', 'mask_2.png', test[0], test[1], test[2], test[3]).start()
+    data = IrisDetection('database/004/03.bmp', 'database/004/04.bmp').start()
+    IrisRecognition('mask_1.png', 'mask_2.png',
+                    data[0], data[1], data[2], data[3]).start()
