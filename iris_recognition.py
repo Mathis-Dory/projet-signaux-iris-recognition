@@ -168,7 +168,6 @@ class IrisDetection:
         cv.imwrite("mask_2.png", result2)
 
     def display(self):
-
         numpy_concat_grey = np.concatenate(
             (self.img_gray_1, self.img_gray_2), axis=1)
         numpy_concat_gauss = np.concatenate(
@@ -185,12 +184,13 @@ class IrisDetection:
         numpy_concat_iris = np.concatenate(
             (self.img_loaded_1, self.img_loaded_2), axis=1)
 
+
         ver1 = np.concatenate(
             (numpy_concat_grey, numpy_concat_gauss, numpy_concat_canny, numpy_concat_binary), axis=0)
         ver2 = np.concatenate((numpy_concat_pupils, numpy_concat_iris), axis=0)
-
+        # vertical = np.column_stack((ver1, ver2))
         cv.imshow("Images grises -> Gauss -> Canny -> binaires", ver1)
-        cv.imshow("Images iris", ver2)
+        cv.imshow("Images pupilles -> iris", ver2)
         cv.waitKey(0)
         cv.destroyAllWindows()
         cv.waitKey(1)
@@ -272,7 +272,7 @@ class IrisRecognition():
             cv.WARP_POLAR_LINEAR)
         polar_img = cv.rotate(polar_img, cv.ROTATE_90_COUNTERCLOCKWISE)
 
-        polar_img = polar_img[int(polar_img.shape[0] / 2)                              : polar_img.shape[0], 0: polar_img.shape[1]]
+        polar_img = polar_img[int(polar_img.shape[0] / 2): polar_img.shape[0], 0: polar_img.shape[1]]
         polar_img = cv.cvtColor(polar_img, cv.COLOR_BGR2GRAY)
         self.polar_1 = polar_img
 
@@ -312,9 +312,11 @@ class IrisRecognition():
                 good.append([m])
 
         if len(good) >= 40:
-            print("Les iris sont pareilles, avec un score de " + str(len(good)))
+            print('\033[96m' + "Les iris sont pareilles, avec un score de " + str(len(good)))
+            return True
         else:
-            print("Les iris sont différentes, avec un score de " + str(len(good)))
+            print("\033[91m" + "Les iris sont différentes, avec un score de " + str(len(good)))
+            return False
 
     def display(self):
         numpy_concat_vertical = np.concatenate(
@@ -328,12 +330,10 @@ class IrisRecognition():
 
 if __name__ == "__main__":
     Tk().withdraw()
-    tk.messagebox.showinfo(title="Iris Recognition",
-                           message="Choisissez un premier iris")
+    tk.messagebox.showinfo(title="Iris Recognition", message="Choisissez un premier iris")
     filename_1 = askopenfilename(title="Choisir un iris 1")
 
-    tk.messagebox.showinfo(title="Iris Recognition",
-                           message="Choisissez un second iris")
+    tk.messagebox.showinfo(title="Iris Recognition", message="Choisissez un second iris")
     filename_2 = askopenfilename(title="Choisir un iris 2")
     data = IrisDetection(filename_1, filename_2).start()
     IrisRecognition('mask_1.png', 'mask_2.png',
