@@ -92,6 +92,7 @@ class IrisDetection:
                     self.mask_1, center, radius, (255, 255, 255), -1)
                 self.pupil_1 = (center[0], center[1], radius)
                 cv.circle(self.img_loaded_1, center, radius, (255, 0, 255), 3)
+        cv.imwrite("pupil1.png", self.img_loaded_1)
 
         # Image 2
 
@@ -113,6 +114,7 @@ class IrisDetection:
                     self.mask_3, center, radius, (255, 255, 255), -1)
                 self.pupil_2 = (center[0], center[1], radius)
                 cv.circle(self.img_loaded_2, center, radius, (255, 0, 255), 3)
+        cv.imwrite("pupil2.png", self.img_loaded_2)
 
     def detect_iris(self):
         # La distance minimum entre deux cercles est donnée par le rayon de la pupille * 8 afin d'éviter
@@ -166,8 +168,7 @@ class IrisDetection:
         cv.imwrite("mask_2.png", result2)
 
     def display(self):
-        numpy_concat_originals = np.concatenate(
-            (self.original_1, self.original_2), axis=1)
+
         numpy_concat_grey = np.concatenate(
             (self.img_gray_1, self.img_gray_2), axis=1)
         numpy_concat_gauss = np.concatenate(
@@ -176,13 +177,18 @@ class IrisDetection:
             (self.img_edge_1, self.img_edge_2), axis=1)
         numpy_concat_binary = np.concatenate(
             (self.binary_1, self.binary_2), axis=1)
+
+        pupil1 = cv.imread("pupil1.png")
+        pupil2 = cv.imread("pupil2.png")
+        numpy_concat_pupils = np.concatenate(
+            (pupil1, pupil2), axis=1)
         numpy_concat_iris = np.concatenate(
             (self.img_loaded_1, self.img_loaded_2), axis=1)
 
         ver1 = np.concatenate(
             (numpy_concat_grey, numpy_concat_gauss, numpy_concat_canny, numpy_concat_binary), axis=0)
-        ver2 = numpy_concat_iris
-        # vertical = np.column_stack((ver1, ver2))
+        ver2 = np.concatenate((numpy_concat_pupils, numpy_concat_iris), axis=0)
+
         cv.imshow("Images grises -> Gauss -> Canny -> binaires", ver1)
         cv.imshow("Images iris", ver2)
         cv.waitKey(0)
@@ -266,7 +272,7 @@ class IrisRecognition():
             cv.WARP_POLAR_LINEAR)
         polar_img = cv.rotate(polar_img, cv.ROTATE_90_COUNTERCLOCKWISE)
 
-        polar_img = polar_img[int(polar_img.shape[0] / 2): polar_img.shape[0], 0: polar_img.shape[1]]
+        polar_img = polar_img[int(polar_img.shape[0] / 2)                              : polar_img.shape[0], 0: polar_img.shape[1]]
         polar_img = cv.cvtColor(polar_img, cv.COLOR_BGR2GRAY)
         self.polar_1 = polar_img
 
@@ -322,10 +328,12 @@ class IrisRecognition():
 
 if __name__ == "__main__":
     Tk().withdraw()
-    tk.messagebox.showinfo(title="Iris Recognition", message="Choisissez un premier iris")
+    tk.messagebox.showinfo(title="Iris Recognition",
+                           message="Choisissez un premier iris")
     filename_1 = askopenfilename(title="Choisir un iris 1")
 
-    tk.messagebox.showinfo(title="Iris Recognition", message="Choisissez un second iris")
+    tk.messagebox.showinfo(title="Iris Recognition",
+                           message="Choisissez un second iris")
     filename_2 = askopenfilename(title="Choisir un iris 2")
     data = IrisDetection(filename_1, filename_2).start()
     IrisRecognition('mask_1.png', 'mask_2.png',
